@@ -106,11 +106,14 @@ const cookies = args.reduce((obj, arg) => {
 
     console.log(`Nombre de slides : ${maxNumber}`);
   }
+  page.on('console', msg => console.log('PAGE LOG:', msg.text()));
 
-  const elements = await page.$$('.slide-item-view__title');
-
+  let item_used = {};
   // Parcourir chaque élément
   for (let i = 0; i <= maxAriaLabel; i++) {
+    // Récupérer la liste des éléments à chaque itération
+    const elements = await page.$$('.slide-item-view__title');
+
     // Sélectionner l'élément avec le aria-label correspondant
     const item = await Promise.all(elements.map(async element => {
       const ariaLabel = await element.evaluate(el => el.getAttribute('aria-label'));
@@ -120,12 +123,12 @@ const cookies = args.reduce((obj, arg) => {
     })).then(results => results.find(result => result !== null));
 
     // console.log(item);
-    if (item) {
+    if (item && !item_used[i]) {
       // Cliquer sur l'élément
       await item.click();
 
       // Attendre un peu pour que la page se charge
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Sélectionner l'élément avec la classe content-area
       const contentAreas = await page.$$('.content-area');
@@ -135,8 +138,20 @@ const cookies = args.reduce((obj, arg) => {
         // Faire une capture d'écran de l'élément
         await page.setViewport({ width: 1920, height: 1080 });
         await contentArea.screenshot({ path: `screenshot${i}.jpg`, quality: 100, type: 'jpeg'});
+        item_used[i] = true;
       }
     }
+    await page.evaluate(() => {
+      const container = document.querySelector('div[style*="padding-top"]');
+      let paddingTop = parseInt(container.dataset.paddingTop || container.style.paddingTop, 10);
+      console.log(`Avant: ${paddingTop}`);
+      paddingTop += 71; // Ajustez le nombre au besoin
+      container.style.paddingTop = `${paddingTop}px`;
+      container.dataset.paddingTop = paddingTop;
+      console.log(`Après: ${container.style.paddingTop}`);
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log("\n");
   }
 
   // Fermer le navigateur
