@@ -101,16 +101,25 @@ const cookies = args.reduce((obj, arg) => {
           maxNumber = totalNumber;
         }
       }
+      maxAriaLabel = maxNumber;
     }
 
-    console.log(`Max number: ${maxNumber}`);
+    console.log(`Nombre de slides : ${maxNumber}`);
   }
+
+  const elements = await page.$$('.slide-item-view__title');
 
   // Parcourir chaque élément
   for (let i = 0; i <= maxAriaLabel; i++) {
     // Sélectionner l'élément avec le aria-label correspondant
-    const item = await page.$(`.slide-item-view__title[aria-label="${i}.&nbsp;---"]`);
-    console.log(maxAriaLabel);
+    const item = await Promise.all(elements.map(async element => {
+      const ariaLabel = await element.evaluate(el => el.getAttribute('aria-label'));
+      const testResult = new RegExp(`^${i+1}\.`).test(ariaLabel);      
+      console.log(`aria-label: ${ariaLabel}, test result: ${testResult}`);
+      return testResult ? element : null;
+    })).then(results => results.find(result => result !== null));
+
+    // console.log(item);
     if (item) {
       // Cliquer sur l'élément
       await item.click();
@@ -126,8 +135,6 @@ const cookies = args.reduce((obj, arg) => {
         // Faire une capture d'écran de l'élément
         await page.setViewport({ width: 1920, height: 1080 });
         await contentArea.screenshot({ path: `screenshot${i}.jpg`, quality: 100, type: 'jpeg'});
-      } else {
-        console.log('No elements with the class .content-area were found.');
       }
     }
   }
