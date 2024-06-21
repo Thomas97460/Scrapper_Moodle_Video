@@ -10,7 +10,7 @@ const cookies = args.reduce((obj, arg) => {
 }, {});
 
 (async () => {
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   const page = await browser.newPage();
 
   // Set the cookies
@@ -47,9 +47,9 @@ const cookies = args.reduce((obj, arg) => {
 
   // Suppose que le bouton de lecture a la classe "launch-screen-button"
   const playButtonSelector = ".launch-screen-button";
-
   // Clique sur le bouton de lecture
   await page.click(playButtonSelector);
+  await page.screenshot({ path: 'screenshot.png' });
 
   let lastAriaLabel = -1;
   let maxAriaLabel = 0;
@@ -67,24 +67,50 @@ const cookies = args.reduce((obj, arg) => {
     // Attendre un peu pour que les nouveaux éléments se chargent
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Sélectionner à nouveau tous les éléments de la barre latérale
-    const sidebarItems = await page.$$('.slide-item-view');
+    // // Sélectionner à nouveau tous les éléments de la barre latérale
+    // const sidebarItems = await page.$$('.slide-item-view');
 
-    // Trouver le aria-label maximum
-    for (let item of sidebarItems) {
-      const ariaLabel = await page.evaluate(el => el.getAttribute('aria-label'), item);
-      const ariaLabelNumber = Number(ariaLabel);
-      if (ariaLabelNumber > maxAriaLabel) {
-        maxAriaLabel = ariaLabelNumber;
+    // // Trouver le aria-label maximum
+    // for (let item of sidebarItems) {
+    //   const ariaLabel = await page.evaluate(el => el.getAttribute('aria-label'), item);
+    //   console.log(ariaLabel)
+    //   const ariaLabelNumber = Number(ariaLabel);
+    //   if (ariaLabelNumber > maxAriaLabel) {
+    //     maxAriaLabel = ariaLabelNumber;
+    //   }
+    //   console.log(maxAriaLabel);
+    // }
+    // Sélectionner tous les éléments avec la classe "progressbar__label"
+    const progressBars = await page.$$('.progressbar__label');
+
+    let maxNumber = 0;
+
+    for (let progressBar of progressBars) {
+      // Récupérer la valeur de l'attribut aria-label
+      const ariaLabel = await page.evaluate(el => el.getAttribute('aria-label'), progressBar);
+
+      // Utiliser une expression régulière pour extraire les chiffres
+      const match = ariaLabel.match(/(\d+) \/ (\d+)/);
+
+      if (match) {
+        const currentNumber = Number(match[1]);
+        const totalNumber = Number(match[2]);
+
+        // Mettre à jour le nombre maximum si nécessaire
+        if (totalNumber > maxNumber) {
+          maxNumber = totalNumber;
+        }
       }
     }
+
+    console.log(`Max number: ${maxNumber}`);
   }
 
   // Parcourir chaque élément
   for (let i = 0; i <= maxAriaLabel; i++) {
     // Sélectionner l'élément avec le aria-label correspondant
-    const item = await page.$(`.slide-item-view[aria-label="${i}"]`);
-
+    const item = await page.$(`.slide-item-view__title[aria-label="${i}.&nbsp;---"]`);
+    console.log(maxAriaLabel);
     if (item) {
       // Cliquer sur l'élément
       await item.click();
