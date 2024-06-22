@@ -1,5 +1,11 @@
 const puppeteer = require('puppeteer');
-const fs = require('fs').promises;
+// const fs = require('fs').promises;
+let fetch;
+import('node-fetch').then(module => {
+    fetch = module.default;
+});
+const path = require('path');
+const fs = require('fs/promises');
 
 // Get the command-line arguments
 const args = process.argv.slice(2);
@@ -9,6 +15,10 @@ const arguments = args.reduce((obj, arg) => {
   obj[key.replace('-', '')] = value;
   return obj;
 }, {});
+
+// Préparation requêtes pour télécharger audio
+const cookies = `MoodleSession=${arguments.session}; MOODLEID1_=${arguments.id}`;
+const base_audio_url = arguments.url.replace('index.html', '');
 
 (async () => {
   const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
@@ -70,14 +80,74 @@ const arguments = args.reduce((obj, arg) => {
       const contentArea = await page.$('.content-area');
       if (contentArea) {
         await fs.mkdir(`${folderPath}/${i}`, { recursive: true });
+      
         await page.setViewport({ width: 1920, height: 1080 });
+      
         await contentArea.screenshot({ path: `${folderPath}/${i}/screenshot.jpg`, quality: 100, type: 'jpeg'});
+        console.log(`Capture d'écran ${i}`);
+      } else {
+        console.log(`Échec de la capture d'écran ${i} : zone de contenu non trouvée.`);
       }
+
+    // Création d'un AbortController pour gérer le timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // Définir un timeout de 30 secondes
+
+    try {
+      console.log(`Téléchargement de l'audio ${i}...`);
+      const audioUrl = `${base_audio_url}data/sound${i}.mp3`;
+      console.log(audioUrl);
+
+      // Passer le signal d'annulation à fetch
+      const response = await fetch(audioUrl, {
+        headers: {
+          'Cookie': cookies
+        },
+        signal: controller.signal
+      });
+
+      if (response.ok) {
+        console.log(`Audio ${i} en cours de téléchargement...`);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const audioFilePath = `${folderPath}/${i}/sound${i}.mp3`;
+        await fs.writeFile(audioFilePath, buffer);
+        console.log(`Audio ${i} téléchargé avec succès.`);
+      } else {
+        console.log(`Échec du téléchargement de l'audio ${i}.`);
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log(`Téléchargement de l'audio ${i} annulé car il a dépassé 30 secondes.`);
+      } else {
+        console.log(`Échec du téléchargement de l'audio ${i} en raison d'une erreur: ${error.message}`);
+      }
+    } finally {
+      clearTimeout(timeout); // Nettoyer le timeout pour éviter les fuites de mémoire
+    }
+
+    await new Promise(resolve => setTimeout(resolve, arguments.timeout));
+
+    // Alternative : Utiliser Puppeteer pour télécharger le fichier audio
+    // const audioUrl = `${base_audio_url}data/sound${i}.mp3`;
+    // const audioResponse = await page.goto(audioUrl, {
+    //   waitUntil: 'networkidle2'
+    // });
+    // if (audioResponse.ok()) {
+    //   const buffer = await audioResponse.buffer();
+    //   const audioFilePath = path.join(folderPath, `${i}`, `sound${i}.mp3`);
+    //   await fs.promises.writeFile(audioFilePath, buffer);
+    //   console.log(`Audio ${i} téléchargé avec succès.`);
+    // } else {
+    //   console.log(`Échec du téléchargement de l'audio ${i}.`);
+    // }
+
       // Cliquer sur le bouton "Next"
       await nextButton.click();
 
       // Vérifier à nouveau si le bouton "Next" est désactivé
       isDisabled = !(await page.$('.universal-control-panel__button_next:not([disabled])'));
+      console.log("\n");
     } else {
       isDisabled = true;
     }
