@@ -54,6 +54,9 @@ const cookies = args.reduce((obj, arg) => {
   let lastAriaLabel = -1;
   let maxAriaLabel = 0;
 
+  // Un ensemble pour stocker les aria-label déjà traités
+  let processedAriaLabels = new Set();
+
   // Faire défiler la barre latérale jusqu'à ce qu'il n'y ait plus de nouveaux éléments à charger
   while (maxAriaLabel > lastAriaLabel) {
     lastAriaLabel = maxAriaLabel;
@@ -68,40 +71,49 @@ const cookies = args.reduce((obj, arg) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Sélectionner à nouveau tous les éléments de la barre latérale
+    console.log("Selecting sidebar items...");
     const sidebarItems = await page.$$('.slide-item-view');
+    console.log(`Found ${sidebarItems.length} sidebar items.`);
 
-    // Trouver le aria-label maximum
+    // Trouver le aria-label maximum et traiter les nouveaux éléments
     for (let item of sidebarItems) {
       const ariaLabel = await page.evaluate(el => el.getAttribute('aria-label'), item);
+      console.log(`Processing item with ariaLabel: ${ariaLabel}`);
       const ariaLabelNumber = Number(ariaLabel);
       if (ariaLabelNumber > maxAriaLabel) {
         maxAriaLabel = ariaLabelNumber;
+        console.log(`New maxAriaLabel found: ${maxAriaLabel}`);
       }
-    }
-  }
 
-  // Parcourir chaque élément
-  for (let i = 0; i <= maxAriaLabel; i++) {
-    // Sélectionner l'élément avec le aria-label correspondant
-    const item = await page.$(`.slide-item-view[aria-label="${i}"]`);
+      // Si l'élément n'a pas encore été traité, le traiter
+      if (!processedAriaLabels.has(ariaLabel)) {
+        console.log(`Processing new ariaLabel: ${ariaLabel}`);
+        processedAriaLabels.add(ariaLabel);
 
-    if (item) {
-      // Cliquer sur l'élément
-      await item.click();
+        // Get the current content of the .content-area element
+        const oldContent = await page.evaluate(() => {
+          const contentArea = document.querySelector('.content-area');
+          return contentArea ? contentArea.innerHTML : '';
+        });
+        console.log("Old content fetched.");
 
-      // Attendre un peu pour que la page se charge
-      await new Promise(resolve => setTimeout(resolve, 1000));
+        // Cliquer sur l'élément
+        console.log("Clicking on item...");
+        await item.click();
 
-      // Sélectionner l'élément avec la classe content-area
-      const contentAreas = await page.$$('.content-area');
-      if (contentAreas.length > 0) {
-        const contentArea = contentAreas[0];
-
-        // Faire une capture d'écran de l'élément
-        await page.setViewport({ width: 1920, height: 1080 });
-        await contentArea.screenshot({ path: `screenshot${i}.jpg`, quality: 100, type: 'jpeg'});
+        // Attendre que le contenu de l'élément .content-area change
+        console.log("Waiting for content area to update...");
+        await page.waitForFunction(
+          (oldContent) => {
+            const contentArea = document.querySelector('.content-area');
+            return contentArea && contentArea.innerHTML !== oldContent;
+          },
+          {},
+          oldContent
+        );
+        console.log("Content area updated.");
       } else {
-        console.log('No elements with the class .content-area were found.');
+        console.log(`ariaLabel ${ariaLabel} has already been processed.`);
       }
     }
   }
