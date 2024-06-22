@@ -10,7 +10,7 @@ const cookies = args.reduce((obj, arg) => {
 }, {});
 
 (async () => {
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   const page = await browser.newPage();
 
   // Set the cookies
@@ -47,9 +47,9 @@ const cookies = args.reduce((obj, arg) => {
 
   // Suppose que le bouton de lecture a la classe "launch-screen-button"
   const playButtonSelector = ".launch-screen-button";
-
   // Clique sur le bouton de lecture
   await page.click(playButtonSelector);
+  await page.screenshot({ path: 'screenshot.png' });
 
   let lastAriaLabel = -1;
   let maxAriaLabel = 0;
@@ -70,52 +70,91 @@ const cookies = args.reduce((obj, arg) => {
     // Attendre un peu pour que les nouveaux éléments se chargent
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Sélectionner à nouveau tous les éléments de la barre latérale
-    console.log("Selecting sidebar items...");
-    const sidebarItems = await page.$$('.slide-item-view');
-    console.log(`Found ${sidebarItems.length} sidebar items.`);
+    // // Sélectionner à nouveau tous les éléments de la barre latérale
+    // const sidebarItems = await page.$$('.slide-item-view');
 
-    // Trouver le aria-label maximum et traiter les nouveaux éléments
-    for (let item of sidebarItems) {
-      const ariaLabel = await page.evaluate(el => el.getAttribute('aria-label'), item);
-      console.log(`Processing item with ariaLabel: ${ariaLabel}`);
-      const ariaLabelNumber = Number(ariaLabel);
-      if (ariaLabelNumber > maxAriaLabel) {
-        maxAriaLabel = ariaLabelNumber;
-        console.log(`New maxAriaLabel found: ${maxAriaLabel}`);
+    // // Trouver le aria-label maximum
+    // for (let item of sidebarItems) {
+    //   const ariaLabel = await page.evaluate(el => el.getAttribute('aria-label'), item);
+    //   console.log(ariaLabel)
+    //   const ariaLabelNumber = Number(ariaLabel);
+    //   if (ariaLabelNumber > maxAriaLabel) {
+    //     maxAriaLabel = ariaLabelNumber;
+    //   }
+    //   console.log(maxAriaLabel);
+    // }
+    // Sélectionner tous les éléments avec la classe "progressbar__label"
+    const progressBars = await page.$$('.progressbar__label');
+
+    let maxNumber = 0;
+
+    for (let progressBar of progressBars) {
+      // Récupérer la valeur de l'attribut aria-label
+      const ariaLabel = await page.evaluate(el => el.getAttribute('aria-label'), progressBar);
+
+      // Utiliser une expression régulière pour extraire les chiffres
+      const match = ariaLabel.match(/(\d+) \/ (\d+)/);
+
+      if (match) {
+        const currentNumber = Number(match[1]);
+        const totalNumber = Number(match[2]);
+
+        // Mettre à jour le nombre maximum si nécessaire
+        if (totalNumber > maxNumber) {
+          maxNumber = totalNumber;
+        }
       }
+      maxAriaLabel = maxNumber;
+    }
 
-      // Si l'élément n'a pas encore été traité, le traiter
-      if (!processedAriaLabels.has(ariaLabel)) {
-        console.log(`Processing new ariaLabel: ${ariaLabel}`);
-        processedAriaLabels.add(ariaLabel);
+    console.log(`Nombre de slides : ${maxNumber}`);
+  }
+  page.on('console', msg => console.log('PAGE LOG:', msg.text()));
 
-        // Get the current content of the .content-area element
-        const oldContent = await page.evaluate(() => {
-          const contentArea = document.querySelector('.content-area');
-          return contentArea ? contentArea.innerHTML : '';
-        });
-        console.log("Old content fetched.");
+  let item_used = {};
+  // Parcourir chaque élément
+  for (let i = 0; i <= maxAriaLabel; i++) {
+    // Récupérer la liste des éléments à chaque itération
+    const elements = await page.$$('.slide-item-view__title');
 
-        // Cliquer sur l'élément
-        console.log("Clicking on item...");
-        await item.click();
+    // Sélectionner l'élément avec le aria-label correspondant
+    const item = await Promise.all(elements.map(async element => {
+      const ariaLabel = await element.evaluate(el => el.getAttribute('aria-label'));
+      const testResult = new RegExp(`^${i+1}\.`).test(ariaLabel);      
+      console.log(`aria-label: ${ariaLabel}, test result: ${testResult}`);
+      return testResult ? element : null;
+    })).then(results => results.find(result => result !== null));
 
-        // Attendre que le contenu de l'élément .content-area change
-        console.log("Waiting for content area to update...");
-        await page.waitForFunction(
-          (oldContent) => {
-            const contentArea = document.querySelector('.content-area');
-            return contentArea && contentArea.innerHTML !== oldContent;
-          },
-          {},
-          oldContent
-        );
-        console.log("Content area updated.");
-      } else {
-        console.log(`ariaLabel ${ariaLabel} has already been processed.`);
+    // console.log(item);
+    if (item && !item_used[i]) {
+      // Cliquer sur l'élément
+      await item.click();
+
+      // Attendre un peu pour que la page se charge
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Sélectionner l'élément avec la classe content-area
+      const contentAreas = await page.$$('.content-area');
+      if (contentAreas.length > 0) {
+        const contentArea = contentAreas[0];
+
+        // Faire une capture d'écran de l'élément
+        await page.setViewport({ width: 1920, height: 1080 });
+        await contentArea.screenshot({ path: `screenshot${i}.jpg`, quality: 100, type: 'jpeg'});
+        item_used[i] = true;
       }
     }
+    await page.evaluate(() => {
+      const container = document.querySelector('div[style*="padding-top"]');
+      let paddingTop = parseInt(container.dataset.paddingTop || container.style.paddingTop, 10);
+      console.log(`Avant: ${paddingTop}`);
+      paddingTop += 71; // Ajustez le nombre au besoin
+      container.style.paddingTop = `${paddingTop}px`;
+      container.dataset.paddingTop = paddingTop;
+      console.log(`Après: ${container.style.paddingTop}`);
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log("\n");
   }
 
   // Fermer le navigateur
