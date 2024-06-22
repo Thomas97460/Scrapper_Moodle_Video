@@ -65,6 +65,9 @@ const base_audio_url = arguments.url.replace('index.html', '');
   // Clique sur le bouton de lecture
   await page.click(playButtonSelector);
 
+  const playPauseButtonSelector = ".universal-control-panel__button.universal-control-panel__button_play-pause";
+  await page.click(playPauseButtonSelector);
+  
   let i = 0;
   let isDisabled = false;
   while(!isDisabled) {
