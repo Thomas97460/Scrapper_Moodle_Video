@@ -131,20 +131,6 @@ const base_audio_url = arguments.url.replace('index.html', '');
 
     await new Promise(resolve => setTimeout(resolve, arguments.timeout));
 
-    // Alternative : Utiliser Puppeteer pour télécharger le fichier audio
-    // const audioUrl = `${base_audio_url}data/sound${i}.mp3`;
-    // const audioResponse = await page.goto(audioUrl, {
-    //   waitUntil: 'networkidle2'
-    // });
-    // if (audioResponse.ok()) {
-    //   const buffer = await audioResponse.buffer();
-    //   const audioFilePath = path.join(folderPath, `${i}`, `sound${i}.mp3`);
-    //   await fs.promises.writeFile(audioFilePath, buffer);
-    //   console.log(`Audio ${i} téléchargé avec succès.`);
-    // } else {
-    //   console.log(`Échec du téléchargement de l'audio ${i}.`);
-    // }
-
       // Cliquer sur le bouton "Next"
       await nextButton.click();
 
