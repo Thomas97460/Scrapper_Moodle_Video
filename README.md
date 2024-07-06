@@ -4,7 +4,7 @@ Ce projet utilise Puppeteer et Node.js pour automatiser la capture d'écran et l
 
 screener.js : Capture des captures d'écran et télécharge des fichiers audio à partir d'une URL spécifique.
 loop_screener.js : Lit un fichier de configuration contenant des URL et des dossiers de destination, puis exécute screener.js pour chaque entrée du fichier.
-Prérequis
+## Prérequis
 Node.js v16 ou supérieur
 npm (gestionnaire de paquets de Node.js)
 Accès à une instance Moodle avec les cookies de session nécessaires
