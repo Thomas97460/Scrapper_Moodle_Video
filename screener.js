@@ -129,6 +129,7 @@ const base_audio_url = arguments.url.replace('index.html', '');
       clearTimeout(timeout); // Nettoyer le timeout pour éviter les fuites de mémoire
     }
 
+    console.log(`Attente de ${arguments.timeout} ms...`)
     await new Promise(resolve => setTimeout(resolve, arguments.timeout));
 
       // Cliquer sur le bouton "Next"
