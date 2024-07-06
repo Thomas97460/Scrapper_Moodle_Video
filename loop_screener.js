@@ -41,7 +41,7 @@ rl.on('close', async () => { // Transformez cette fonction en asynchrone
     for (const element of liste) {
       const url = element[0];
       const folder = element[1];
-      const command = `node screener.js -url="${url}" -folder="${folder}" -session=${arguments.session} -id=${arguments.id} -timeout=${arguments.timeout}`;
+      const command = `node screener.js -url="${url}" -folder=${folder} -session=${arguments.session} -id=${arguments.id} -timeout=${arguments.timeout}`;
       console.log(`Commande à exécuter: ${command}`);
       try {
         const { stdout, stderr } = await execAsync(command); // Attendre la fin de l'exécution
